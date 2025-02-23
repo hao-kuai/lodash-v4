@@ -83,6 +83,8 @@ try {
 TypeError: Cannot assign to read only property 'Symbol(Symbol.toStringTag)' of object '#<Object>'
 ```
 
+报错以后，也就意味着，我们无法通过修改属性值来获取原始标签。也就是 Object.freeze 场景下，我们无法获取原始标签。
+
 ### 4. 恢复属性值：
 
 函数最后会根据属性的原始状态进行恢复：

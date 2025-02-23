@@ -1,5 +1,3 @@
-# Lodash 源码解析：getRawTag 函数的实现原理
-
 ## 功能概述
 
 getRawTag 函数是 Lodash 中一个重要的内部工具函数，主要用于获取对象的原始类型标签。它通过巧妙的方式解决了 Symbol.toStringTag 可能被篡改导致的类型误判问题，是 Lodash 类型检测系统中的关键组件。

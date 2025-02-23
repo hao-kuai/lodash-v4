@@ -3400,10 +3400,14 @@
      * @returns {string} 返回标签
      */
     function baseGetTag(value) {
+      // 1. 快速处理 null 和 undefined
       if (value == null) {
-        //
         return value === undefined ? undefinedTag : nullTag;
       }
+      // 2. 优先通过 Symbol.toStringTag 获取精确标签（避免环境兼容性问题），回退到 Object.prototype.toString 作为兜底方案。
+      // 2.1 symToStringTag：ES6 引入的 Symbol.toStringTag 允许对象自定义 toString 的返回值。
+      // 2.2 若 symToStringTag 存在且 Object(value) 的原型链上包含该属性，则直接调用 getRawTag(value) 获取原始标签（如 "[object String]"）
+      // 2.3 否则，回退到使用 objectToString(value)（即 Object.prototype.toString.call(value)），确保兼容性（如 IE11 中 DataView 对象的标签问题）
       return symToStringTag && symToStringTag in Object(value)
         ? getRawTag(value)
         : objectToString(value);
@@ -6668,19 +6672,27 @@
      * @returns {string} 返回从 value 中获取的 tag
      */
     function getRawTag(value) {
+      // 检查属性是否为对象自有（而非原型链继承），避免误操作原型链上的属性
       var isOwn = hasOwnProperty.call(value, symToStringTag),
-        tag = value[symToStringTag];
+        tag = value[symToStringTag]; // 保存原始标签值
 
+      // 1. 属性不可写：防止因修改受保护属性导致的运行时错误：Object.freeze
+      // 2. 属性不存在：避免在严格模式下访问未定义属性引发异常。
       try {
+        // 尝试临时屏蔽标签
         value[symToStringTag] = undefined;
+        // 标记已屏蔽
         var unmasked = true;
       } catch (e) {}
 
+      // 获取类型标签
       var result = nativeObjectToString.call(value);
       if (unmasked) {
         if (isOwn) {
+          // 恢复自有属性
           value[symToStringTag] = tag;
         } else {
+          // 删除非自有属性（其实删除undefined）
           delete value[symToStringTag];
         }
       }
@@ -12531,7 +12543,6 @@
      *
      * 既不是正的 Infinity，也不是负的 Infinity 或 NaN
      *
-     * todo:这个注释好想不准
      * **Note:** This method is based on
      * [`Number.isFinite`](https://mdn.io/Number/isFinite).
      *
@@ -12561,6 +12572,9 @@
       // nativeIsFinite(null)      // true，因为 null 会被转换为 0
       // nativeIsFinite(false)     // true，因为 false 会被转换为 0
       // nativeIsFinite('')        // true，因为空字符串会被转换为 0
+
+      // 1. 通过严格类型检查避免非数字类型被误判为有限值（如字符串 "123" 会被 typeof 识别为 "string"）
+      // 2. 与全局 isFinite 函数不同，Lodash 的实现不进行类型转换（如将字符串转为数字），确保类型安全性
       return typeof value == "number" && nativeIsFinite(value);
     }
 
@@ -12590,7 +12604,7 @@
       // `typeof` 运算符只能返回 `object`，返回的类型不够精确，无法判断具体类型，
       // 所以采用Object.prototype.toString方案返回 `Object#toString`
       var tag = baseGetTag(value);
-      // todo
+      // todofuncTag（普通函数），genTag（生成器函数），asyncTag（异步函数），proxyTag（代理函数）
       return (
         tag == funcTag || tag == genTag || tag == asyncTag || tag == proxyTag
       );
@@ -13105,7 +13119,10 @@
      * // => false
      */
     function isString(value) {
-      // todo !isArray(value) 作用是什么
+      // 1.处理 String
+      // 2.处理 String 对象
+      // 2.1 首先排除 array，通过修改System.toStringTag 值，可以达到目的
+      // 2.2 排除 array 后，处理 String 对象
       return (
         typeof value == "string" ||
         (!isArray(value) &&

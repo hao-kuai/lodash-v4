@@ -6,7 +6,7 @@ isPlainObject 函数是 Lodash 中用于判断一个值是否为纯粹对象（p
 
 ```js
 function isPlainObject(value) {
-  if (!isObjectLike(value) || baseGetTag(value) != "[object Object]") {
+  if (!isObjectLike(value) || baseGetTag(value) != objectTag) {
     return false;
   }
   var proto = getPrototype(value);
@@ -29,7 +29,7 @@ function isPlainObject(value) {
 函数首先进行两个基础检查：
 
 ```js
-if (!isObjectLike(value) || baseGetTag(value) != "[object Object]") {
+if (!isObjectLike(value) || baseGetTag(value) != objectTag) {
   return false;
 }
 ```
@@ -48,11 +48,12 @@ if (proto === null) {
 }
 ```
 
-- 如果对象没有原型（proto 为 null），则认为是纯粹对象
-  - 这种情况通常出现在通过 Object.create(null) 创建的对象
-  - `Object.setPrototypeOf({}, null);`
+如果对象没有原型（proto 为 null），则认为是纯粹对象,比如以下创建对象方式
 
-### 3. 构造函数验证-待补充详细的示例
+- `Object.create(null)`
+- `Object.setPrototypeOf({}, null);`
+
+### 3. 构造函数验证
 
 最后一步是验证对象的构造函数：
 
@@ -65,31 +66,77 @@ return (
 );
 ```
 
-这个验证包含三个条件：
+#### 3.1 hasOwnProperty.call(proto, "constructor")
 
-1. 构造函数必须是函数类型：`typeof Ctor == 'function'`
-2. 构造函数必须是自身的实例：`Ctor instanceof Ctor`
-3. 构造函数的字符串表示必须匹配 Object 构造函数：`funcToString.call(Ctor) === objectCtorString`
-
-### 4. 特殊情况处理
-
-函数能够正确处理以下特殊情况：
+确保 proto 对象自身拥有 constructor 属性，避免因原型污染或手动修改导致的误判。
 
 ```js
-// 自定义构造函数创建的对象
-function Custom() {}
-const customObj = new Custom();
-isPlainObject(customObj); // => false
-
-// Object.create 创建的对象
-const protoObj = { a: 1 };
-const createdObj = Object.create(protoObj);
-isPlainObject(createdObj); // => false
-
-// null 原型对象
-const nullProtoObj = Object.create(null);
-isPlainObject(nullProtoObj); // => true
+// 假设原型对象被修改，丢失了 constructor 属性
+const obj = Object.create({ __proto__: null });
+obj.constructor = null; // 手动删除 constructor 属性
+// 若不检查 hasOwnProperty，直接通过 proto.constructor 获取会得到 undefined
+// 导致后续类型判断失败
 ```
+
+#### 3.2 proto.constructor
+
+获取原型链中对象的构造函数。
+
+```js
+const obj = new (function Custom() {})();
+const proto = Object.getPrototypeOf(obj); // 获取原型对象
+
+// proto.constructor 指向 Custom 函数（自定义构造函数）
+// 若 proto.constructor 为 undefined（如 Object.create(null)），则跳过后续检查
+```
+
+#### 3.3 typeof Ctor == "function"
+
+过滤掉非函数类型的构造器（如字符串、数字等），确保后续逻辑安全。
+
+```js
+const obj = {};
+// 将 constructor 属性设为字符串
+Object.setPrototypeOf(obj, { constructor: "not a function" });
+// Ctor 为 "not a function"（字符串类型），typeof Ctor 为 "string"，条件不成立
+```
+
+#### 3.4 Ctor instanceof Ctor
+
+作用：确保构造函数未被篡改或污染，防止通过修改原型链绕过类型检查。
+示例：
+
+```js
+// 假设原型链被恶意修改
+function Malicious() {}
+Malicious.prototype = Object.create(Array.prototype); // 将原型指向 Array.prototype
+
+const obj = new Malicious();
+const proto = Object.getPrototypeOf(obj); // 获取原型对象
+const Ctor = proto.constructor; // Ctor 指向 Malicious 函数
+
+// Malicious 函数的原型被修改为 Array.prototype，此时 Ctor instanceof Ctor 为 false
+```
+
+#### 3.5 funcToString.call(Ctor) === objectCtorString
+
+区分 Object 构造函数与其他自定义构造函数（如 Array、Date 等），确保仅纯对象通过验证。
+
+```js
+// 自定义构造函数
+function Custom() {}
+const obj = new Custom();
+const proto = Object.getPrototypeOf(obj); // 获取原型对象
+const Ctor = proto.constructor; // Ctor 指向 Custom 函数
+
+// funcToString.call(Ctor) 返回 "[object Function]"，与 objectCtorString（"[object Object]"）不匹配
+```
+
+这些条件共同确保了：
+
+- 原型链未被篡改（条件 1、4、5）。
+- 构造函数类型正确（条件 3、5）。
+- 仅通过 {} 或 new Object() 创建的纯对象通过验证（条件 2、4、5）。
 
 ## 总结
 
@@ -98,5 +145,3 @@ isPlainObject 函数通过多层次的检查机制，准确识别纯粹对象：
 1. 首先确保值是对象类型且具有正确的类型标签
 2. 然后检查原型链，处理无原型对象的特殊情况
 3. 最后通过构造函数的严格验证，确保对象是通过 Object 构造函数或对象字面量创建
-
-这种实现方式既保证了检测的准确性，又覆盖了各种边界情况，是 Lodash 类型检测体系中的重要组成部分。

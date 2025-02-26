@@ -1,4 +1,4 @@
-# Lodash 源码阅读 - isNaN
+> 此处 isNaN 是\_.isNaN，不是全局的 isNaN。
 
 ## 功能概述
 

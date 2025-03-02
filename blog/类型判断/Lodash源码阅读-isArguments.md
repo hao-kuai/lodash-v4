@@ -1,3 +1,8 @@
+---
+highlight: tomorrow-night-bright
+theme: vue-pro
+---
+
 ## 功能概述
 
 isArguments 函数是 Lodash 中用于检测给定值是否为 arguments 对象的工具函数。它通过组合标签检测和特性检测两种策略，确保在不同 JavaScript 环境下都能准确识别 arguments 对象。
@@ -26,9 +31,9 @@ function baseIsArguments(value) {
 
 ## 实现原理解析
 
-### 1. 双重实现策略
+### 1. 两种判断方式的巧妙结合
 
-isArguments 函数采用了一种优雅的双重实现策略：
+来看看这段代码：
 
 ```js
 var isArguments = baseIsArguments(
@@ -42,7 +47,7 @@ var isArguments = baseIsArguments(
     };
 ```
 
-这种策略的特点：
+这里的思路其实很巧妙：
 
 - 首先测试基于标签的检测方法（baseIsArguments）是否在当前环境有效
 - 如果有效，则使用更高效的标签检测
@@ -69,7 +74,7 @@ var realArgs = testFunc(1, 2, 3);
 console.log(isArguments(realArgs)); // true
 ```
 
-### 2. 基于标签的检测（baseIsArguments）
+### 2. 标签检测方式（baseIsArguments）
 
 ```js
 function baseIsArguments(value) {
@@ -77,31 +82,31 @@ function baseIsArguments(value) {
 }
 ```
 
-这种检测方法包含两个关键步骤：
+这个检测方式分两步走：
 
-#### 2.1 类对象检查
+#### 2.1 先看看是不是像对象
 
 ```js
 isObjectLike(value);
 ```
 
-这一步确保值是类对象类型（非 null 且 typeof 为 'object'），排除了原始类型值：
+这一步就是确保这个值看起来像个对象（不是 null，typeof 得到 'object'）。来看几个例子：
 
 ```js
-// 返回 false 的情况
+// 这些都不是 arguments，肯定返回 false
 isArguments(null); // false
 isArguments(undefined); // false
 isArguments(42); // false
 isArguments("string"); // false
 ```
 
-#### 2.2 标签检测
+#### 2.2 再看看标签对不对
 
 ```js
 baseGetTag(value) == argsTag;
 ```
 
-这一步通过 Object.prototype.toString 获取对象的内部 [[Class]] 标签，并与 arguments 对象的标签（'[object Arguments]'）进行比较：
+这步是通过 Object.prototype.toString 看看这个对象的内部标签是不是 '[object Arguments]'：
 
 ```js
 // 在支持标准 arguments 对象的环境中
@@ -111,7 +116,7 @@ function foo() {
 foo(1, 2, 3);
 ```
 
-### 3. 基于特性的检测（降级实现）
+### 3. 特征检测方式（备选方案）
 
 ```js
 function(value) {
@@ -120,23 +125,23 @@ function(value) {
 }
 ```
 
-这种检测方法基于 arguments 对象的特有属性，包含三个判断条件：
+这个方案就是看看这个值是不是具备 arguments 对象的特征，主要检查三点：
 
-#### 3.1 类对象检查
+#### 3.1 还是先看看像不像对象
 
 ```js
 isObjectLike(value);
 ```
 
-与 baseIsArguments 相同，确保值是类对象类型。
+跟前面一样，确保是个对象类型的值。
 
-#### 3.2 callee 属性检查
+#### 3.2 看看有没有 callee 属性
 
 ```js
 hasOwnProperty.call(value, "callee");
 ```
 
-检查对象是否拥有 'callee' 属性，这是 arguments 对象的特有属性，指向当前执行的函数：
+arguments 对象有个特别的属性叫 callee，指向当前正在执行的函数：
 
 ```js
 // arguments 对象特有的 callee 属性
@@ -150,13 +155,13 @@ var obj = { length: 3, 0: "a", 1: "b", 2: "c" };
 console.log("callee" in obj); // false
 ```
 
-#### 3.3 callee 属性不可枚举检查
+#### 3.3 确认 callee 属性不能被遍历
 
 ```js
 !propertyIsEnumerable.call(value, "callee");
 ```
 
-确保 'callee' 属性是不可枚举的，这是原生 arguments 对象的特征：
+真正的 arguments 对象的 callee 属性是不能被 for...in 遍历的：
 
 ```js
 // 原生 arguments 对象的 callee 属性不可枚举
@@ -175,4 +180,4 @@ console.log(Object.propertyIsEnumerable.call(fakeArgs, "callee")); // true
 
 ## 总结
 
-isArguments 函数通过巧妙结合标签检测和特性检测两种策略，实现了对 arguments 对象的准确识别。其实现考虑了不同 JavaScript 环境的兼容性，同时保持了代码的简洁性和高效性。
+isArguments 它用了两种方式来识别 arguments 对象：一种是看对象的标签，另一种是看对象的特征。这样不管在什么环境下都能准确判断。既保证了兼容性，又没有变得很复杂。
